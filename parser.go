@@ -115,6 +115,13 @@ func (p *Parser) Parse() (Node, error) {
 			} else {
 				return nil, fmt.Errorf("%q not allowed in state %v", c, ETAG_NAME)
 			}
+		case ELEMENT_EMPTY_END:
+			if c == '>' {
+				doElementEnd()
+				state = CHARACTERS
+			} else {
+				return nil, fmt.Errorf("%q not allowed in state %v", c, ELEMENT_EMPTY_END)
+			}
 		default:
 			return nil, fmt.Errorf("unhandled state: %v", state)
 		}

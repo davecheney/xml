@@ -6,6 +6,8 @@ import (
 	"testing"
 )
 
+func text(s string) Node { t := Text(s); return &t }
+
 var parserParseTests = []struct {
 	input string
 	want  Node
@@ -14,6 +16,26 @@ var parserParseTests = []struct {
 	{
 		"<a></a>",
 		&Element{Name: Name{Local: "a"}},
+		nil,
+	},
+	{
+		"<a/>",
+		&Element{Name: Name{Local: "a"}},
+		nil,
+	},
+	{
+		"<a><b/></a>",
+		&Element{Name: Name{Local: "a"},
+			Children: []Node{
+				&Element{Name: Name{Local: "b"}}},
+		},
+		nil,
+	},
+	{
+		"<a>foo</a>",
+		&Element{Name: Name{Local: "a"},
+			Children: []Node{text("foo")},
+		},
 		nil,
 	},
 }
