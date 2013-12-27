@@ -16,6 +16,11 @@ func (b *builder) doElementStart(name string) *builder {
 	}
 }
 
+func (b *builder) doElementEnd() *builder {
+	b.parent.addContent(b.build())
+	return b.parent
+}
+
 func (b *builder) build() *Element {
 	return &Element{
 		Name:     b.qname(),
@@ -46,11 +51,11 @@ func (b *builder) qname() Name {
 }
 
 func (b *builder) declaredNamespaceForPrefix(prefix string) string {
-	if ns, ok := b.declaredNamespaces[prefix]; ok {
-		return ns
-	} else if b.parent != nil {
-		return b.parent.declaredNamespaceForPrefix(prefix)
-	} else {
+	if prefix == "" {
 		return ""
 	}
+	if ns, ok := b.declaredNamespaces[prefix]; ok {
+		return ns
+	}
+	return b.parent.declaredNamespaceForPrefix(prefix)
 }

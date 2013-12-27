@@ -9,7 +9,7 @@ type Parser struct {
 	r io.Reader
 }
 
-func (p *Parser) Parse() (*Element, error) {
+func (p *Parser) Parse() (Node, error) {
 	const (
 		CHARACTERS = iota
 		STAG_NAME_START
@@ -17,11 +17,19 @@ func (p *Parser) Parse() (*Element, error) {
 		DECLARATION_START
 		PROCESSING_INSTRUCTION_START
 		ETAG_NAME_START
+		ETAG_NAME
 		ATTRIBUTE_NAME_START
 		ELEMENT_EMPTY_END
+		ELEMENT_END
 	)
 	state := CHARACTERS
-	var builder *builder
+	builder := &builder{
+		declaredNamespaces: map[string]string{
+			"":      "",
+			"xml":   "http://www.w3.org/XML/1998/namespace",
+			"xmlns": "http://www.w3.org/2000/xmlns/",
+		},
+	}
 
 	buf := make([]byte, 4096)
 
@@ -45,6 +53,10 @@ func (p *Parser) Parse() (*Element, error) {
 	}
 	doElementStart := func() {
 		builder = builder.doElementStart(subsequence())
+		reset()
+	}
+	doElementEnd := func() {
+		builder = builder.doElementEnd()
 		reset()
 	}
 	for ; limit < n; limit++ {
@@ -85,6 +97,24 @@ func (p *Parser) Parse() (*Element, error) {
 			} else {
 				return nil, fmt.Errorf("%q not allowed in state %v", c, STAG_NAME)
 			}
+		case ETAG_NAME_START:
+			if isNameStartChar(rune(c)) {
+				state = ETAG_NAME
+			} else {
+				return nil, fmt.Errorf("%q not allowed in state %v", c, ETAG_NAME_START)
+			}
+		case ETAG_NAME:
+			if isNameChar(rune(c)) {
+				// consume
+			} else if isWhitespace(rune(c)) {
+				reset()
+				state = ELEMENT_END
+			} else if c == '>' {
+				doElementEnd()
+				state = CHARACTERS
+			} else {
+				return nil, fmt.Errorf("%q not allowed in state %v", c, ETAG_NAME)
+			}
 		default:
 			return nil, fmt.Errorf("unhandled state: %v", state)
 		}
@@ -92,11 +122,18 @@ func (p *Parser) Parse() (*Element, error) {
 	if err != nil {
 		return nil, err
 	}
-	return builder.build(), nil
+	return builder.content[0], nil
 }
 
 // TODO(dfc)
-func isBlank(s string) bool { return false }
+func isBlank(s string) bool {
+	for _, c := range s {
+		if !isWhitespace(c) {
+			return false
+		}
+	}
+	return true
+}
 
 func isNameStartChar(c rune) bool {
 	return c == ':' || (c >= 'A' && c <= 'Z') || c == '_' || (c >= 'a' && c <= 'z') || (c >= '\u00C0' && c <= '\u00D6') || (c >= '\u00D8' && c <= '\u00F6') || (c >= '\u00F8' && c <= '\u02FF') || (c >= '\u0370' && c <= '\u037D') || (c >= '\u037F' && c <= '\u1FFF') || (c >= '\u200C' && c <= '\u200D') || (c >= '\u2070' && c <= '\u218F') || (c >= '\u2C00' && c <= '\u2FEF') || (c >= '\u3001' && c <= '\uD7FF') || (c >= '\uF900' && c <= '\uFDCF') || (c >= '\uFDF0' && c <= '\uFFFD')
